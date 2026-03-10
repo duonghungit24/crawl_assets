@@ -60,7 +60,7 @@ Client app --> Supabase PostgREST API --> PostgreSQL (read)
 | 1 | Setup & DB Schema | **done** | 2h | [phase-01](phase-01-setup-and-db-schema.md) |
 | 2 | VN Crawlers | **done** | 3h | [phase-02](phase-02-vn-crawlers.md) |
 | 3 | World Crawlers | **done** | 2.5h | [phase-03](phase-03-world-crawlers.md) |
-| 4 | API & RPC | pending | 1.5h | [phase-04](phase-04-api-and-rpc.md) |
+| 4 | API & RPC | **done** | 1.5h | [phase-04](phase-04-api-and-rpc.md) |
 | 5 | GitHub Actions | pending | 1.5h | [phase-05](phase-05-github-actions.md) |
 | 6 | Testing & Polish | pending | 1.5h | [phase-06](phase-06-testing-and-polish.md) |
 
