@@ -1,93 +1,139 @@
-# crawl_assets
+# Commodity Price API
 
+Crawl Vietnamese + international commodity prices on schedule, store in PostgreSQL, expose via Supabase PostgREST auto API. Zero cost (all free tier).
 
-
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Architecture
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/duonghung2412/crawl_assets.git
-git branch -M main
-git push -uf origin main
+GitHub Actions (cron) --> HTTP POST --> Supabase Edge Functions
+Edge Functions --> scrape HTML / fetch API --> UPSERT into PostgreSQL
+Client app --> Supabase PostgREST API --> PostgreSQL (read)
 ```
 
-## Integrate with your tools
+## Data Sources
 
-* [Set up project integrations](https://gitlab.com/duonghung2412/crawl_assets/-/settings/integrations)
+| Data | Symbols | Source | Method |
+|------|---------|--------|--------|
+| Gold VN | SJC_9999, SJC_RING, PNJ_GOLD, DOJI_GOLD | webgia.com | HTML scraping |
+| Silver VN | PNJ_SILVER | (placeholder) | — |
+| Gasoline VN | RON95, RON98, DIESEL | Petrolimex via webgia.com | HTML scraping |
+| Oil World | WTI_USD, BRENT_USD | Yahoo Finance Chart API | JSON |
+| Metals World | XAU_USD, XAG_USD | Yahoo Finance Chart API | JSON |
+| Gasoline World | RBOB_USD | Yahoo Finance Chart API | JSON |
 
-## Collaborate with your team
+## Schedules (GitHub Actions Cron)
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+| Crawler | Cron (UTC) | Local Time |
+|---------|-----------|------------|
+| crawl-gold-vn | `0 2,5,8,11 * * *` | 9am, 12pm, 3pm, 6pm ICT |
+| crawl-silver-vn | `0 5,11 * * *` | 12pm, 6pm ICT |
+| crawl-gasoline-vn | `0 3 * * *` | 10am ICT daily |
+| crawl-oil-world | `0 22 * * 1-5` | Weekdays after US close |
+| crawl-metals-world | `0 */4 * * 1-5` | Every 4h weekdays |
+| crawl-gasoline-world | `0 22 * * 1-5` | Weekdays after US close |
 
-## Test and Deploy
+## API Endpoints
 
-Use the built-in continuous integration in GitLab.
+Base URL: `https://<project-ref>.supabase.co`
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+### Read prices (PostgREST auto API)
 
-***
+```bash
+# All prices
+curl "$SUPABASE_URL/rest/v1/prices?select=*" -H "apikey: $SUPABASE_ANON_KEY"
 
-# Editing this README
+# Filter by symbol
+curl "$SUPABASE_URL/rest/v1/prices?symbol=eq.SJC_9999&order=fetched_at.desc&limit=10" \
+  -H "apikey: $SUPABASE_ANON_KEY"
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+# Latest price per symbol (RPC)
+curl "$SUPABASE_URL/rest/v1/rpc/get_latest_prices" -H "apikey: $SUPABASE_ANON_KEY"
+```
 
-## Suggestions for a good README
+### Trigger crawlers (Edge Functions)
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+```bash
+curl -X POST "$SUPABASE_URL/functions/v1/crawl-gold-vn" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "x-crawl-secret: $CRAWL_SECRET"
+```
 
-## Name
-Choose a self-explaining name for your project.
+## Setup
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### Prerequisites
+- [Supabase CLI](https://supabase.com/docs/guides/cli)
+- Deno (for local Edge Function development)
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+### 1. Link Supabase project
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+```bash
+supabase link --project-ref <your-project-ref>
+```
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+### 2. Run migrations
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+```bash
+supabase db push
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+### 3. Deploy Edge Functions
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```bash
+supabase functions deploy crawl-gold-vn
+supabase functions deploy crawl-silver-vn
+supabase functions deploy crawl-gasoline-vn
+supabase functions deploy crawl-oil-world
+supabase functions deploy crawl-metals-world
+supabase functions deploy crawl-gasoline-world
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+### 4. Set secrets
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+```bash
+supabase secrets set CRAWL_SECRET=your-secret-here
+```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### 5. GitHub Actions secrets
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+Add to repository Settings > Secrets:
+- `SUPABASE_URL` — your Supabase project URL
+- `SUPABASE_ANON_KEY` — your Supabase anon key
+- `CRAWL_SECRET` — same value as Edge Function secret
 
-## License
-For open source projects, say how it is licensed.
+### 6. Smoke test
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+```bash
+export SUPABASE_URL=https://<ref>.supabase.co
+export SUPABASE_ANON_KEY=<anon-key>
+export CRAWL_SECRET=<secret>
+./scripts/test-crawlers.sh
+```
+
+## Local Development
+
+```bash
+supabase start
+supabase functions serve crawl-gold-vn --env-file supabase/.env.local
+```
+
+## Project Structure
+
+```
+supabase/
+├── migrations/          # DB schema (prices table, RLS, RPC)
+├── functions/
+│   ├── _shared/         # Shared utilities
+│   │   ├── crawl-auth.ts        # Auth verification
+│   │   ├── html-parser.ts       # HTML parsing (deno-dom)
+│   │   ├── yahoo-finance.ts     # Yahoo Finance API client
+│   │   ├── response-helpers.ts  # HTTP response helpers
+│   │   └── supabase-client.ts   # Supabase service client
+│   ├── crawl-gold-vn/       # SJC, PNJ, DOJI gold
+│   ├── crawl-silver-vn/     # Placeholder
+│   ├── crawl-gasoline-vn/   # Petrolimex RON95/98, Diesel
+│   ├── crawl-oil-world/     # WTI, Brent via Yahoo
+│   ├── crawl-metals-world/  # XAU, XAG via Yahoo
+│   └── crawl-gasoline-world/ # RBOB via Yahoo
+.github/workflows/           # Cron triggers for each crawler
+scripts/test-crawlers.sh     # Smoke test script
+```

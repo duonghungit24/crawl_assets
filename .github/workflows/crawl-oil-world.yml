@@ -1,0 +1,34 @@
+name: Crawl Oil World
+
+on:
+  schedule:
+    # Weekdays after US market close (10pm UTC)
+    - cron: "0 22 * * 1-5"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger Edge Function
+        run: |
+          RESPONSE=$(curl -s --max-time 60 --connect-timeout 10 -w "\n%{http_code}" \
+            -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/crawl-oil-world" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "x-crawl-secret: ${{ secrets.CRAWL_SECRET }}" \
+            -H "Content-Type: application/json")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "::error::Crawl failed with status $HTTP_CODE"
+            exit 1
+          fi

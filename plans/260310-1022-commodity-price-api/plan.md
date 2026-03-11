@@ -1,7 +1,7 @@
 ---
 title: "Commodity Price Crawling API"
 description: "Supabase-based API crawling VN and world commodity prices on schedule"
-status: pending
+status: done
 priority: P1
 effort: 12h
 branch: main
@@ -61,8 +61,8 @@ Client app --> Supabase PostgREST API --> PostgreSQL (read)
 | 2 | VN Crawlers | **done** | 3h | [phase-02](phase-02-vn-crawlers.md) |
 | 3 | World Crawlers | **done** | 2.5h | [phase-03](phase-03-world-crawlers.md) |
 | 4 | API & RPC | **done** | 1.5h | [phase-04](phase-04-api-and-rpc.md) |
-| 5 | GitHub Actions | pending | 1.5h | [phase-05](phase-05-github-actions.md) |
-| 6 | Testing & Polish | pending | 1.5h | [phase-06](phase-06-testing-and-polish.md) |
+| 5 | GitHub Actions | **done** | 1.5h | [phase-05](phase-05-github-actions.md) |
+| 6 | Testing & Polish | **done** | 1.5h | [phase-06](phase-06-testing-and-polish.md) |
 
 ## Key Dependencies
 - Supabase project (free tier) with anon key + service role key
